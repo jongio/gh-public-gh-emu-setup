@@ -49,6 +49,21 @@ function Get-TerminalCommandLine {
     return 'pwsh.exe -NoLogo -NoExit -Command "& { ' + ($commands -join '; ') + ' }"'
 }
 
+function Get-AuthenticatedLogin {
+    param(
+        [Parameter(Mandatory)][string]$GhPath,
+        [Parameter(Mandatory)][string]$HostName
+    )
+
+    $jqExpression = ".hosts.`"$HostName`"[] | select(.active == true and .state == `"success`") | .login"
+    $login = & $GhPath auth status --hostname $HostName --json hosts --jq $jqExpression 2> $null
+    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($login)) {
+        return $null
+    }
+
+    return $login.Trim()
+}
+
 function Invoke-IsolatedAuthentication {
     param(
         [Parameter(Mandatory)][string]$GhPath,
@@ -76,30 +91,17 @@ function Invoke-IsolatedAuthentication {
         $env:GH_CONFIG_DIR = $ConfigDirectory
         $env:GH_HOST = $HostName
 
-        & $GhPath auth status --hostname $HostName *> $null
-        if ($LASTEXITCODE -ne 0) {
+        $login = Get-AuthenticatedLogin -GhPath $GhPath -HostName $HostName
+        if ([string]::IsNullOrWhiteSpace($login)) {
             Write-Information "Authenticate the $Label account on $HostName." -InformationAction Continue
             & $GhPath auth login --hostname $HostName --web
             if ($LASTEXITCODE -ne 0) {
                 throw "GitHub CLI authentication failed for $Label."
             }
-        }
-
-        $statusJson = & $GhPath auth status --hostname $HostName --json hosts
-        if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($statusJson)) {
-            throw "Unable to verify the authenticated $Label account."
-        }
-
-        $status = $statusJson | ConvertFrom-Json -ErrorAction Stop
-        $hostProperty = $status.hosts.PSObject.Properties[$HostName]
-        $activeAccount = if ($hostProperty) {
-            $hostProperty.Value |
-                Where-Object { $_.active -and $_.state -eq 'success' } |
-                Select-Object -First 1
-        }
-        $login = $activeAccount.login
-        if ([string]::IsNullOrWhiteSpace($login)) {
-            throw "Unable to find the active authenticated $Label account."
+            $login = Get-AuthenticatedLogin -GhPath $GhPath -HostName $HostName
+            if ([string]::IsNullOrWhiteSpace($login)) {
+                throw "Unable to verify the authenticated $Label account."
+            }
         }
 
         Write-Information "$Label verified as $login." -InformationAction Continue

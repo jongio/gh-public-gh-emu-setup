@@ -122,7 +122,8 @@ $record = [ordered]@{
 }
 $record | ConvertTo-Json -Compress | Add-Content $env:GH_SETUP_TEST_LOG
 if ($args[0] -eq 'auth' -and $args[1] -eq 'status') {
-    if ($args -contains '--json') {
+    $markerPath = Join-Path $env:GH_CONFIG_DIR '.fake-authenticated'
+    if (-not $env:GH_SETUP_TEST_FAIL_LOGIN -and (Test-Path -LiteralPath $markerPath)) {
         $login = if ($env:GH_SETUP_TEST_SAME_ACCOUNT) {
             'same-user'
         } elseif ($env:GH_CONFIG_DIR -like '*gh-emu') {
@@ -130,13 +131,14 @@ if ($args[0] -eq 'auth' -and $args[1] -eq 'status') {
         } else {
             'public-user'
         }
-        '{"hosts":{"github.com":[{"state":"success","active":true,"host":"github.com","login":"' + $login + '"}]}}'
+        $login
         exit 0
     }
     exit 1
 }
 if ($args[0] -eq 'auth' -and $args[1] -eq 'login') {
     if ($env:GH_SETUP_TEST_FAIL_LOGIN) { exit 1 }
+    Set-Content -LiteralPath (Join-Path $env:GH_CONFIG_DIR '.fake-authenticated') -Value 'true'
     exit 0
 }
 exit 2
