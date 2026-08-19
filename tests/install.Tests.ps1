@@ -122,15 +122,21 @@ $record = [ordered]@{
 }
 $record | ConvertTo-Json -Compress | Add-Content $env:GH_SETUP_TEST_LOG
 if ($args[0] -eq 'auth' -and $args[1] -eq 'status') {
+    if ($args -contains '--json') {
+        $login = if ($env:GH_SETUP_TEST_SAME_ACCOUNT) {
+            'same-user'
+        } elseif ($env:GH_CONFIG_DIR -like '*gh-emu') {
+            'emu-user'
+        } else {
+            'public-user'
+        }
+        '{"hosts":{"github.com":[{"state":"success","active":true,"host":"github.com","login":"' + $login + '"}]}}'
+        exit 0
+    }
     exit 1
 }
 if ($args[0] -eq 'auth' -and $args[1] -eq 'login') {
     if ($env:GH_SETUP_TEST_FAIL_LOGIN) { exit 1 }
-    exit 0
-}
-if ($args[0] -eq 'api' -and $args[1] -eq 'user') {
-    if ($env:GH_SETUP_TEST_SAME_ACCOUNT) { 'same-user'; exit 0 }
-    if ($env:GH_CONFIG_DIR -like '*gh-emu') { 'emu-user' } else { 'public-user' }
     exit 0
 }
 exit 2

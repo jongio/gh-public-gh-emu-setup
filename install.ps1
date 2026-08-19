@@ -85,9 +85,21 @@ function Invoke-IsolatedAuthentication {
             }
         }
 
-        $login = & $GhPath api user --hostname $HostName --jq '.login'
-        if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($login)) {
+        $statusJson = & $GhPath auth status --hostname $HostName --json hosts
+        if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($statusJson)) {
             throw "Unable to verify the authenticated $Label account."
+        }
+
+        $status = $statusJson | ConvertFrom-Json -ErrorAction Stop
+        $hostProperty = $status.hosts.PSObject.Properties[$HostName]
+        $activeAccount = if ($hostProperty) {
+            $hostProperty.Value |
+                Where-Object { $_.active -and $_.state -eq 'success' } |
+                Select-Object -First 1
+        }
+        $login = $activeAccount.login
+        if ([string]::IsNullOrWhiteSpace($login)) {
+            throw "Unable to find the active authenticated $Label account."
         }
 
         Write-Information "$Label verified as $login." -InformationAction Continue
