@@ -1,5 +1,7 @@
 # Isolated GitHub CLI Authentication for Multiple Accounts
 
+![Two isolated Windows Terminal profiles connecting separate managed and public GitHub accounts to locked configuration folders](docs/images/github-account-isolation.png)
+
 When terminals share GitHub CLI's default configuration, `gh auth switch` changes the active account for that shared configuration. One terminal can therefore change the account used by another terminal.
 
 The fix is `GH_CONFIG_DIR`, an environment variable that tells `gh` where to store and read its configuration. By pointing each terminal at a separate config directory, each session gets fully isolated auth with zero cross-talk.
